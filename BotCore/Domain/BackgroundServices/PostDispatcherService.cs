@@ -30,6 +30,12 @@ public class PostDispatcherService(
 
                 foreach (var post in unprocessedPosts)
                 {
+                    if (post.Id is null)
+                    {
+                        logger.LogWarning("Пропущен входящий пост без Mongo _id из канала {ChannelId}", post.ChannelId);
+                        continue;
+                    }
+
                     var subscriptionTypes = await subscriptionRepository.GetByChannelIdAsync(post.ChannelId, stoppingToken);
 
                     if (subscriptionTypes.Count == 0)
@@ -50,9 +56,13 @@ public class PostDispatcherService(
                             {
                                 try
                                 {
+                                    var channelTitle = string.IsNullOrWhiteSpace(post.ChannelTitle)
+                                        ? $"ID {post.ChannelId}"
+                                        : post.ChannelTitle;
+
                                     await botClient.SendMessage(
                                         chatId: userId,
-                                        text: post.Text,
+                                        text: $"Канал: {channelTitle}\n\n{post.Text}",
                                         cancellationToken: stoppingToken);
                                 }
                                 catch (Exception ex)

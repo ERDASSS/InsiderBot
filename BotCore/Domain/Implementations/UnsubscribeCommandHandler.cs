@@ -1,7 +1,6 @@
 using BotCore.Repository;
 using Contracts;
 using Telegram.Bot;
-using Telegram.Bot.Types;
 
 namespace BotCore.Domain.Implementations;
 
@@ -10,68 +9,70 @@ public class UnsubscribeCommandHandler(
     IUserSubscriptionRepository userSubscriptionsRepository) : ICommandHandler
 {
     public string Command => CommandsConsts.Unsubscribe;
-    
-    public async Task HandleAsync(ITelegramBotClient bot, Message message, CancellationToken ct)
+
+    public async Task HandleAsync(ITelegramBotClient bot, CommandContext context, CancellationToken ct)
     {
-        var parts = message.Text!.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        
+        var parts = context.Text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
         if (parts.Length < 2)
         {
-            await ShowUserSubscriptionsAsync(bot, message.Chat.Id, ct);
+            await ShowUserSubscriptionsAsync(bot, context.ChatId, context.UserId, ct);
             return;
         }
-        
+
         var subscriptionTypeId = parts[1];
         var subscriptionType = await subscriptionsRepository.FindByIdAsync(subscriptionTypeId, ct);
- 
+
         if (subscriptionType is null)
         {
             await bot.SendMessage(
-                message.Chat.Id,
+                context.ChatId,
                 $"Подписки с id \"{subscriptionTypeId}\" не существует.\nПосмотреть доступные — просто /unsubscribe без аргумента.",
+                replyMarkup: BotKeyboards.MainMenu,
                 cancellationToken: ct);
             return;
         }
- 
-        await userSubscriptionsRepository.UnsubscribeAsync(message.From!.Id, subscriptionTypeId, ct);
- 
+
+        await userSubscriptionsRepository.UnsubscribeAsync(context.UserId, subscriptionTypeId, ct);
+
         await bot.SendMessage(
-            message.Chat.Id,
+            context.ChatId,
             $"Готово! Ты отписан от \"{subscriptionType.Name}\".",
+            replyMarkup: BotKeyboards.MainMenu,
             cancellationToken: ct);
     }
-    
-    private async Task ShowUserSubscriptionsAsync(ITelegramBotClient bot, long userId, CancellationToken ct)
+
+    private async Task ShowUserSubscriptionsAsync(ITelegramBotClient bot, long chatId, long userId, CancellationToken ct)
     {
         var userSubscriptionIds = await userSubscriptionsRepository.GetUserSubscriptionTypeIdsAsync(userId, ct);
- 
+
         if (userSubscriptionIds.Count == 0)
         {
             await bot.SendMessage(
-                userId, 
-                "У вас пока нет активных подписок.\nИспользуйте /subscribe, чтобы оформить подписку.", 
+                chatId,
+                "У вас пока нет активных подписок.\nИспользуйте /subscribe, чтобы оформить подписку.",
+                replyMarkup: BotKeyboards.MainMenu,
                 cancellationToken: ct);
             return;
         }
-        
+
         var allTypes = await subscriptionsRepository.GetAllAsync(ct);
-        
         var userTypes = allTypes.Where(t => userSubscriptionIds.Contains(t.Id)).ToList();
 
         if (userTypes.Count == 0)
         {
             await bot.SendMessage(
-                userId,
+                chatId,
                 "У вас есть записи о подписках, но сами типы этих подписок были удалены администратором.",
+                replyMarkup: BotKeyboards.MainMenu,
                 cancellationToken: ct);
             return;
         }
-        
-        var list = string.Join('\n', userTypes.Select(t => $"🔹 {t.Id} — {t.Name}"));
- 
+
         await bot.SendMessage(
-            userId,
-            $"Ваши активные подписки:\n\n{list}\n\nЧтобы отписаться, напиши команду:\n/unsubscribe <id>",
+            chatId,
+            "Выберите подписку, от которой хотите отписаться:",
+            replyMarkup: BotKeyboards.SubscriptionTypes(userTypes, CommandsConsts.Unsubscribe),
             cancellationToken: ct);
     }
 }

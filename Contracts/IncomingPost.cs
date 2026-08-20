@@ -3,6 +3,7 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace Contracts;
 
+[BsonIgnoreExtraElements]
 public class IncomingPost
 {
     [BsonId]
@@ -10,6 +11,7 @@ public class IncomingPost
     public string? Id { get; set; }
  
     public long ChannelId { get; set; }
+    public string? ChannelTitle { get; set; }
     public string Text { get; set; } = default!;
     public DateTime ReceivedAt { get; set; }
     

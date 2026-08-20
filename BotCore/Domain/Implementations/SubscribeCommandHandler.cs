@@ -1,7 +1,6 @@
 using BotCore.Repository;
 using Contracts;
 using Telegram.Bot;
-using Telegram.Bot.Types;
 
 namespace BotCore.Domain.Implementations;
 
@@ -12,51 +11,56 @@ public class SubscribeCommandHandler(
 {
     public string Command => CommandsConsts.Subscribe;
 
-    public async Task HandleAsync(ITelegramBotClient bot, Message message, CancellationToken ct)
+    public async Task HandleAsync(ITelegramBotClient bot, CommandContext context, CancellationToken ct)
     {
-        var parts = message.Text!.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        
+        var parts = context.Text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
         if (parts.Length < 2)
         {
-            await ShowAvailableSubscriptionsAsync(bot, message.Chat.Id, ct);
+            await ShowAvailableSubscriptionsAsync(bot, context.ChatId, ct);
             return;
         }
-        
+
         var subscriptionTypeId = parts[1];
         var subscriptionType = await subscriptionsRepository.FindByIdAsync(subscriptionTypeId, ct);
- 
+
         if (subscriptionType is null)
         {
             await bot.SendMessage(
-                message.Chat.Id,
+                context.ChatId,
                 $"Подписки с id \"{subscriptionTypeId}\" не существует.\nПосмотреть доступные — просто /subscribe без аргумента.",
+                replyMarkup: BotKeyboards.MainMenu,
                 cancellationToken: ct);
             return;
         }
- 
-        await userSubscriptionsRepository.SubscribeAsync(message.From!.Id, subscriptionTypeId, ct);
- 
+
+        await userSubscriptionsRepository.SubscribeAsync(context.UserId, subscriptionTypeId, ct);
+
         await bot.SendMessage(
-            message.Chat.Id,
+            context.ChatId,
             $"Готово! Ты подписан на \"{subscriptionType.Name}\".",
+            replyMarkup: BotKeyboards.MainMenu,
             cancellationToken: ct);
     }
- 
+
     private async Task ShowAvailableSubscriptionsAsync(ITelegramBotClient bot, long chatId, CancellationToken ct)
     {
         var types = await subscriptionsRepository.GetAllAsync(ct);
- 
+
         if (types.Count == 0)
         {
-            await bot.SendMessage(chatId, "Пока нет доступных подписок.", cancellationToken: ct);
+            await bot.SendMessage(
+                chatId,
+                "Пока нет доступных подписок.",
+                replyMarkup: BotKeyboards.MainMenu,
+                cancellationToken: ct);
             return;
         }
- 
-        var list = string.Join('\n', types.Select(t => $"{t.Id} — {t.Name}"));
- 
+
         await bot.SendMessage(
             chatId,
-            $"Доступные подписки:\n{list}\n\nЧтобы подписаться, напиши команду:\n/subscribe <id>",
+            "Выберите подписку:",
+            replyMarkup: BotKeyboards.SubscriptionTypes(types, CommandsConsts.Subscribe),
             cancellationToken: ct);
     }
 }

@@ -1,7 +1,6 @@
 using BotCore.Repository;
 using Contracts;
 using Telegram.Bot;
-using Telegram.Bot.Types;
 
 namespace BotCore.Domain.Implementations;
 
@@ -11,23 +10,21 @@ public class ShowCommandHandler(
 {
     public string Command => CommandsConsts.Show;
 
-    public async Task HandleAsync(ITelegramBotClient bot, Message message, CancellationToken ct)
+    public async Task HandleAsync(ITelegramBotClient bot, CommandContext context, CancellationToken ct)
     {
-        var userId = message.From!.Id;
-        
-        var subscribedTypeIds = await userSubscriptionsRepository.GetUserSubscriptionTypeIdsAsync(userId, ct);
+        var subscribedTypeIds = await userSubscriptionsRepository.GetUserSubscriptionTypeIdsAsync(context.UserId, ct);
 
         if (subscribedTypeIds.Count == 0)
         {
             await bot.SendMessage(
-                userId,
+                context.ChatId,
                 "У вас пока нет активных подписок.\nИспользуйте /subscribe, чтобы оформить подписку.",
+                replyMarkup: BotKeyboards.MainMenu,
                 cancellationToken: ct);
             return;
         }
-        
+
         var allSubscriptionTypes = await subscriptionsRepository.GetAllAsync(ct);
-        
         var mySubscriptions = allSubscriptionTypes
             .Where(st => subscribedTypeIds.Contains(st.Id))
             .ToList();
@@ -35,17 +32,19 @@ public class ShowCommandHandler(
         if (mySubscriptions.Count == 0)
         {
             await bot.SendMessage(
-                userId,
+                context.ChatId,
                 "Ваши предыдущие подписки были удалены администратором.",
+                replyMarkup: BotKeyboards.MainMenu,
                 cancellationToken: ct);
             return;
         }
-        
+
         var list = string.Join("\n", mySubscriptions.Select(s => $"✅ {s.Name} (ID: {s.Id})"));
 
         await bot.SendMessage(
-            userId,
-            $"Ваши активные подписки:\n\n{list}\n\nЧтобы отписаться, используйте команду:\n/unsubscribe <id>",
+            context.ChatId,
+            $"Ваши активные подписки:\n\n{list}",
+            replyMarkup: BotKeyboards.MainMenu,
             cancellationToken: ct);
     }
 }

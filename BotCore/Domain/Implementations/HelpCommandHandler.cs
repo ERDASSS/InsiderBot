@@ -1,6 +1,5 @@
 using Contracts;
 using Telegram.Bot;
-using Telegram.Bot.Types;
 
 namespace BotCore.Domain.Implementations;
 
@@ -8,28 +7,24 @@ public class HelpCommandHandler : ICommandHandler
 {
     public string Command => CommandsConsts.Help;
     
-    public async Task HandleAsync(ITelegramBotClient bot, Message message, CancellationToken ct)
+    public async Task HandleAsync(ITelegramBotClient bot, CommandContext context, CancellationToken ct)
     {
         var helpText = """
-                       📖 <b>Доступные команды:</b>
+                       📖 <b>Доступные действия:</b>
 
-                       /start — Начать работу с ботом
-                       /help — Показать это сообщение
-                       /subscribe — Подписаться на рассылку
-                       /unsubscribe — Отписаться от рассылки
-                       /show — Показать ваши активные подписки
+                       Подписаться — выбрать подписку на рассылку
+                       Отписаться — выбрать подписку для отключения
+                       Мои подписки — показать активные подписки
+                       Помощь — показать это сообщение
 
-                       💡 <b>Примеры использования:</b>
-                       • /subscribe 1 — подписаться на подписку с ID "1"
-                       • /unsubscribe 1 — отписаться от подписки с ID "1"
-
-                       Если у вас возникли вопросы, обратитесь к администратору.
+                       Текстовые команды тоже поддерживаются: /subscribe, /unsubscribe, /show.
                        """;
 
         await bot.SendMessage(
-            chatId: message.Chat.Id,
+            chatId: context.ChatId,
             text: helpText,
             parseMode: Telegram.Bot.Types.Enums.ParseMode.Html,
+            replyMarkup: BotKeyboards.MainMenu,
             cancellationToken: ct);
     }
 }
