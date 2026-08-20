@@ -1,7 +1,7 @@
 using Telegram.Bot;
 using Telegram.Bot.Types;
 
-namespace Core.Domain;
+namespace BotCore.Domain;
 
 public interface ICommandHandler
 {

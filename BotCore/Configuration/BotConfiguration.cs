@@ -1,4 +1,4 @@
-namespace Core.Service;
+namespace BotCore.Configuration;
 
 public class BotConfiguration
 {

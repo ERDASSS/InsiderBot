@@ -2,17 +2,10 @@ using Telegram.Bot;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 
-namespace Core.Domain.BackgroundServices;
+namespace BotCore.Domain;
 
-public class UpdateHandler
+public class UpdateHandler(IEnumerable<ICommandHandler> commandHandlers)
 {
-    private readonly IEnumerable<ICommandHandler> commandHandlers;
- 
-    public UpdateHandler(IEnumerable<ICommandHandler> commandHandlers)
-    {
-        this.commandHandlers = commandHandlers;
-    }
- 
     public async Task HandleAsync(ITelegramBotClient bot, Update update, CancellationToken ct)
     {
         if (update.Type != UpdateType.Message || update.Message?.Text is not { } text)
@@ -28,9 +21,10 @@ public class UpdateHandler
             if (handler is not null)
             {
                 await handler.HandleAsync(bot, message, ct);
+                return;
             }
         }
-        // // Если команда не найдена или это обычный текст — ответ по умолчанию
-        // await bot.SendMessage(message.Chat.Id, $"Ты написал: {text}", cancellationToken: ct);
+
+        await bot.SendMessage(message.Chat.Id, $"Команда не найдена", cancellationToken: ct);
     }
 }

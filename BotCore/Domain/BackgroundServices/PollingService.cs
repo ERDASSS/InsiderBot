@@ -6,24 +6,14 @@ using Telegram.Bot.Polling;
 using Telegram.Bot.Types;
 using Telegram.Bot.Types.Enums;
 
-namespace Core.Domain.BackgroundServices;
+namespace BotCore.Domain.BackgroundServices;
 
-public class PollingService : BackgroundService
+public class PollingService(
+    IServiceProvider serviceProvider,
+    ITelegramBotClient botClient,
+    ILogger<PollingService> logger)
+    : BackgroundService
 {
-    private readonly IServiceProvider serviceProvider;
-    private readonly ITelegramBotClient botClient;
-    private readonly ILogger<PollingService> logger;
- 
-    public PollingService(
-        IServiceProvider serviceProvider,
-        ITelegramBotClient botClient,
-        ILogger<PollingService> logger)
-    {
-        this.serviceProvider = serviceProvider;
-        this.botClient = botClient;
-        this.logger = logger;
-    }
- 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var me = await botClient.GetMe(stoppingToken);

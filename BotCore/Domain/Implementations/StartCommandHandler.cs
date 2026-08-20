@@ -2,7 +2,7 @@ using Contracts;
 using Telegram.Bot;
 using Telegram.Bot.Types;
 
-namespace Core.Domain.Implementations;
+namespace BotCore.Domain.Implementations;
 
 public class StartCommandHandler : ICommandHandler
 {
