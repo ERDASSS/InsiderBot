@@ -47,10 +47,12 @@ public class ChannelListenerService : BackgroundService
             var channelTitle = updates.UserOrChat(msg.peer_id) is ChatBase chat
                 ? chat.Title
                 : null;
+            
+            var channelId = long.Parse($"-100{msg.peer_id.ID}");
  
             var post = new IncomingPost
             {
-                ChannelId = msg.peer_id.ID,
+                ChannelId = channelId,
                 ChannelTitle = channelTitle,
                 Text = msg.message,
                 ReceivedAt = DateTime.UtcNow,
@@ -61,9 +63,9 @@ public class ChannelListenerService : BackgroundService
             {
                 await incomingPosts.InsertOneAsync(post);
                 logger.LogInformation(
-                    "Сохранён новый пост из канала {ChannelTitle} ({ChannelId})",
+                    "Сохранён новый пост из канала {ChannelTitle} ({channelId})",
                     post.ChannelTitle ?? "без названия",
-                    post.ChannelId);
+                    channelId);
             }
             catch (Exception ex)
             {

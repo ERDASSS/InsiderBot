@@ -43,6 +43,7 @@ builder.Services.AddSingleton<IMongoDatabase>(sp =>
 
 builder.Services.AddSingleton<ISubscriptionRepository, MongoSubscriptionRepository>();
 builder.Services.AddSingleton<IUserSubscriptionRepository, MongoUserSubscriptionRepository>();
+builder.Services.AddSingleton<ISubscriptionKeywordMatcher, SubscriptionKeywordMatcher>();
 
 builder.Services.AddScoped<ICommandHandler, StartCommandHandler>();
 builder.Services.AddScoped<ICommandHandler, SubscribeCommandHandler>();

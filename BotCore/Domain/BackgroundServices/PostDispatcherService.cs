@@ -11,11 +11,13 @@ public class PostDispatcherService(
     IMongoDatabase database,
     ISubscriptionRepository subscriptionRepository,
     IUserSubscriptionRepository userSubscriptionRepository,
+    ISubscriptionKeywordMatcher keywordMatcher,
     ITelegramBotClient botClient,
     ILogger<PostDispatcherService> logger)
     : BackgroundService
 {
-    private readonly IMongoCollection<IncomingPost> incomingPosts = database.GetCollection<IncomingPost>("incoming_posts");
+    private readonly IMongoCollection<IncomingPost> incomingPosts =
+        database.GetCollection<IncomingPost>("incoming_posts");
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -24,7 +26,7 @@ public class PostDispatcherService(
             try
             {
                 var unprocessedPosts = await incomingPosts
-                    .Find(x => x.Processed == false)
+                    .Find(x => !x.Processed)
                     .SortBy(x => x.ReceivedAt)
                     .ToListAsync(stoppingToken);
 
@@ -32,11 +34,17 @@ public class PostDispatcherService(
                 {
                     if (post.Id is null)
                     {
-                        logger.LogWarning("Пропущен входящий пост без Mongo _id из канала {ChannelId}", post.ChannelId);
+                        logger.LogWarning(
+                            "Пропущен входящий пост без Mongo _id из канала {ChannelId}",
+                            post.ChannelId);
+
                         continue;
                     }
 
-                    var subscriptionTypes = await subscriptionRepository.GetByChannelIdAsync(post.ChannelId, stoppingToken);
+                    var subscriptionTypes =
+                        await subscriptionRepository.GetByChannelIdAsync(
+                            post.ChannelId,
+                            stoppingToken);
 
                     if (subscriptionTypes.Count == 0)
                     {
@@ -48,27 +56,50 @@ public class PostDispatcherService(
 
                     foreach (var subType in subscriptionTypes)
                     {
-                        var userIds = await userSubscriptionRepository.GetSubscribedUserIdsAsync(subType.Id, stoppingToken);
+                        var isMatch = await keywordMatcher.IsMatchAsync(
+                            subType.Id,
+                            post.Text,
+                            stoppingToken);
+
+                        if (!isMatch)
+                        {
+                            logger.LogDebug(
+                                "Пост {PostId} не прошёл keyword-фильтр подписки {SubscriptionTypeId}",
+                                post.Id,
+                                subType.Id);
+
+                            continue;
+                        }
+
+                        var userIds =
+                            await userSubscriptionRepository
+                                .GetSubscribedUserIdsAsync(
+                                    subType.Id,
+                                    stoppingToken);
 
                         foreach (var userId in userIds)
                         {
-                            if (notifiedUserIds.Add(userId))
+                            if (!notifiedUserIds.Add(userId))
+                                continue;
+
+                            try
                             {
-                                try
-                                {
-                                    var channelTitle = string.IsNullOrWhiteSpace(post.ChannelTitle)
+                                var channelTitle =
+                                    string.IsNullOrWhiteSpace(post.ChannelTitle)
                                         ? $"ID {post.ChannelId}"
                                         : post.ChannelTitle;
 
-                                    await botClient.SendMessage(
-                                        chatId: userId,
-                                        text: $"Канал: {channelTitle}\n\n{post.Text}",
-                                        cancellationToken: stoppingToken);
-                                }
-                                catch (Exception ex)
-                                {
-                                    logger.LogWarning(ex, "Не удалось отправить сообщение пользователю {UserId}", userId);
-                                }
+                                await botClient.SendMessage(
+                                    chatId: userId,
+                                    text: $"Канал: {channelTitle}\n\n{post.Text}",
+                                    cancellationToken: stoppingToken);
+                            }
+                            catch (Exception ex)
+                            {
+                                logger.LogWarning(
+                                    ex,
+                                    "Не удалось отправить сообщение пользователю {UserId}",
+                                    userId);
                             }
                         }
                     }
@@ -76,7 +107,9 @@ public class PostDispatcherService(
                     await MarkAsProcessedAsync(post.Id, stoppingToken);
                 }
 
-                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+                await Task.Delay(
+                    TimeSpan.FromSeconds(5),
+                    stoppingToken);
             }
             catch (OperationCanceledException)
             {
@@ -84,17 +117,26 @@ public class PostDispatcherService(
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Критическая ошибка в цикле PostDispatcherService");
-                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+                logger.LogError(
+                    ex,
+                    "Критическая ошибка в цикле PostDispatcherService");
+
+                await Task.Delay(
+                    TimeSpan.FromSeconds(5),
+                    stoppingToken);
             }
         }
     }
 
-    private async Task MarkAsProcessedAsync(string postId, CancellationToken ct)
+    private async Task MarkAsProcessedAsync(
+        string postId,
+        CancellationToken ct)
     {
         await incomingPosts.UpdateOneAsync(
             x => x.Id == postId,
-            Builders<IncomingPost>.Update.Set(x => x.Processed, true),
+            Builders<IncomingPost>
+                .Update
+                .Set(x => x.Processed, true),
             cancellationToken: ct);
     }
 }
